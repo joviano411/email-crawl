@@ -1,5 +1,6 @@
 # email-crawl
- PHP Email web crawler. using curl or command line. 
+ PHP Email Web Crawler, is a simple and easy to use class that uses curl & command line interface to extract email address from websites. 
+ It also has the feature to deep extract email from website link which is found from the initial target website.
 
 ## Installation
 
