@@ -1,26 +1,35 @@
 <?php
-
+namespace Peterujah\NanoBlock;
+use \Peterujah\NanoBlock\CrawlResponse;
 class EmailCrawl{
-  public const COMMA = ",";
-  public const NEWLINE = "\n";
+  public const VERIFY_HOST = 0;
+  public const SSL_VERIFY_PEER = false;
   private $crawLink;
-  private $crawLevel;
-  private $crawMax;
-  private $crawMails;
-  private $crawUrls;
+  private $crawLevel = 0;
+  private $crawMax = 50;
+  private $crawMails = array();
+  private $crawUrls = array();
   private $crawContents;
+  private $options = array(
+    'http' => array(
+        'method'=>"GET",
+        'header'=>"Content-Type: text/html; charset=utf-8"
+    )
+  );
+  private $crawOutput;
+
 	
   /**
    * Constructor
    * @param string $arg1, int $arg2, int $arg3, string $arg4
    */
-  public function __construct($url, $level = 0, $max = 50, $mails = array()) {
-      $this->init($url, $level, $max, $mails);
+  public function __construct($url, $max = 50, $level = 0, $mails = array()) {
+      $this->init($url, $max, $level, $mails);
   }
   
-  private function init($url, $level, $max, $mails) {
+  private function init($url, $max, $level, $mails) {
       if(!$this->isCli()){ 
-        trigger_error("Please use php-cli!");
+        //trigger_error('Please use php-cli!.', E_USER_ERROR);
       }
       $this->crawLink = $url;
       $this->crawLevel = $level;
@@ -35,6 +44,25 @@ class EmailCrawl{
   private function isCli() {
       return php_sapi_name()==="cli";
   }
+
+  private function curl_get_contents($url, $field = array()) {
+    $ch = curl_init();
+    curl_setopt($ch, CURLOPT_URL, $url);
+    curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'GET');
+    curl_setopt($ch, CURLOPT_HTTPHEADER, array($this->options["http"]["header"]));
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt ($ch, CURLOPT_SSL_VERIFYHOST, self::VERIFY_HOST);   
+    curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, self::SSL_VERIFY_PEER);
+    if(!empty($field)){
+        curl_setopt($ch, CURLOPT_POSTFIELDS,  json_encode($field));
+    }
+    $result = curl_exec($ch);               
+    if ($result === false) {
+        trigger_error('ErrorRequestHandler: ' . curl_error($ch));
+    }
+    curl_close($ch);
+    return $result;
+  }
 	
   /**
    * Get the content of the current page ($this->hp)
@@ -42,15 +70,11 @@ class EmailCrawl{
    */
   public function getContent() {
       if (!function_exists('curl_init')){
-          $content = file_get_contents($this->crawLink, false, $this->getContext());
+          $this->crawContents = file_get_contents($this->crawLink, false, $this->getContext());
       } else {
-          $ch = curl_init();
-          curl_setopt($ch, CURLOPT_URL, $this->crawLink);
-          curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-          $content = curl_exec($ch);
-          curl_close($ch);
+        $this->crawContents = $this->curl_get_contents($this->crawLink);
       }
-      return $content;
+      return $this;
   }
   
   /**
@@ -58,13 +82,7 @@ class EmailCrawl{
    * @return stream_context_resource
    */
   private function getContext() {
-      $opts = array(
-          'http' => array(
-              'method'=>"GET",
-              'header'=>"Content-Type: text/html; charset=utf-8"
-          )
-      );
-      return stream_context_create($opts);
+      return stream_context_create($this->options);
   }
 	
   /**
@@ -72,14 +90,13 @@ class EmailCrawl{
    * Make sure we don't save the same email address multiple times
    * @return array
    */
-  public  function getEmailArray() {
-      $email_pattern_normal="(([-_.\w]+@[a-zA-Z0-9_]+?\.[a-zA-Z0-9]{2,6}))";
-      $email_pattern_exp1="(\w[-._\w]*\w@\w[-._\w]*\w\.\w{2,3})";
-      preg_match_all($email_pattern_normal, $this->crawContents, $result_email_normal, PREG_PATTERN_ORDER);
-      preg_match_all($email_pattern_exp1, $this->crawContents, $result_email_exp1, PREG_PATTERN_ORDER);
-      $email_array=array_merge($result_email_normal, $result_email_exp1);
-      $unique_emails=$this->array_unique_deep($email_array);
-      return $unique_emails;
+  public function getEmailArray() {
+      $pattern1 = "(([-_.\w]+@[a-zA-Z0-9_]+?\.[a-zA-Z0-9]{2,6}))";
+      $pattern2 = "(\w[-._\w]*\w@\w[-._\w]*\w\.\w{2,3})";
+      preg_match_all($pattern1, $this->crawContents, $match1, PREG_PATTERN_ORDER);
+      preg_match_all($pattern2, $this->crawContents, $match2, PREG_PATTERN_ORDER);
+      $emails = $this->array_unique_deep(array_merge($match1, $match2));
+      return $emails;
   }
  
   /**
@@ -87,12 +104,12 @@ class EmailCrawl{
    * @return array
    */
   private function array_unique_deep($array) {
-      $values=array();
+      $values = array();
       foreach ($array as $part) {
           if (is_array($part)) {
-            $values=array_merge($values,$this->array_unique_deep($part));
+            $values= array_merge($values, $this->array_unique_deep($part));
           } else { 
-            $values[]=$part;
+            $values[]= $part;
           }
       }
       return array_unique($values);
@@ -104,12 +121,18 @@ class EmailCrawl{
    * @return array
    */
   public function getURLArray() {
-      $url_pattern='((\:href=\"|(http(s?))\://){1}\S+)';
-      preg_match_all($url_pattern, $this->crawContents, $result_url, PREG_PATTERN_ORDER);
-      array_walk($result_url[0], function(&$item) { $item = substr($item, 0, strpos($item, '"')); });
-      $unique_urls=$this->array_unique_deep($result_url[0]);
-      $unique_urls=array_unique($this->setURLPrefix($unique_urls));
-      return $unique_urls;
+      $pattern = '((\:href=\"|(http(s?))\://){1}\S+)';
+      //$pattern = '#\bhttps?://[^,\s()<>]+(?:\([\w\d]+\)|([^,[:punct:]\s]|/))#';
+      preg_match_all($pattern, $this->crawContents, $match, PREG_PATTERN_ORDER);
+      array_walk($match[0], function(&$item) { 
+        if (strpos($item, '"') !== false) {
+          $item = substr($item, 0, strpos($item, '"')); 
+        }
+      });
+      
+      $links = $this->array_unique_deep($match[0]);
+      $links = array_unique($this->setURLPrefix($links));
+      return $links;
   }
  
   /**
@@ -134,38 +157,48 @@ class EmailCrawl{
     print_r($data);
   }
 
-  public function saveResult($filepath, $data) {
-     $$filename = uniqid() . ".txt";
-     if(!is_dir($filepath)){
-          mkdir($filepath, 0777, true);
-          chmod($filepath, 0755); 
-      }
+    public function getResponse() {
+        return new \CrawlResponse($this->crawMails, 1+count($this->crawUrls));
+    }
 
-      if(file_exists($filepath . $filename)){
-          unlink($filepath . $filename);
-      }
+    public function getEmails() {
+        return $this->crawMails;
+    }
 
-      $fp = fopen($filepath . $filename, 'w');
-      fwrite($fp, $data);
-      fclose($fp);
+    public function getURL() {
+        return $this->crawUrls;
+    }
+
+  
+  public function craw() {
+    $this->execute();
+    return $this;
   }
-	
   /**
    * Start function with recursion
    * Creates new instances depending on recursion depth
    * Merges the obtained email addresses and returns them
    * @return mails
    */
-  public function run() {
-     if($this->crawLevel < $this->crawMax) {
-         $this->crawContents = $this->getContent();
-         $this->crawUrls = $this->getURLArray();
-         $mails = $this->getEmailArray();
-         foreach($this->crawUrls as $url) {
-            $temp = new EmailCrawl($url, $this->crawLevel+1, $this->crawMax, $this->crawMails);
-            $this->crawMails = array_unique(array_merge($temp->run(), $mails));
-         }
-     }
-     return $this->crawMails;
-  }
+  public function execute() {
+    if($this->crawLevel < $this->crawMax) {
+       $mails = $this->getContent()->getEmailArray();
+       $this->crawUrls = $this->getURLArray();
+       if(!empty($this->crawUrls)){
+           foreach($this->crawUrls as $url) {
+               $deep = new EmailCrawl(
+                   $url,
+                   $this->crawMax, 
+                   $this->crawLevel+1, 
+                   $this->crawMails
+                );
+                $deepEmails = $deep->execute();
+                $this->crawMails = array_unique(array_merge($deepEmails, $mails));
+           }
+       }else{
+           $this->crawMails = $mails;
+       }
+    }
+    return $this->crawMails;
+ }
 }
