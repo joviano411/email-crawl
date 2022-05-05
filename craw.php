@@ -2,7 +2,7 @@
 error_reporting(E_ALL);
 ini_set('display_errors', '1');
 require __DIR__ . '/plugins/autoload.php';
-use \DarkScript\EmailCrawl;
+use Peterujah\NanoBlock\EmailCrawl;
 $target = "https://default.com/contact";
 $limit = 50;
 if(!empty($argv[1])){
