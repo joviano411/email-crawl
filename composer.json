@@ -2,6 +2,7 @@
     "name": "peterujah/email-crawl",
     "type": "library",
     "description": "Php class to compress output buffer in gzip.",
+    "homepage": "https://github.com/peterujah/email-crawl",
     "keywords": [
         "library",
         "craw",
@@ -23,14 +24,16 @@
     },
      "extra": {
         "branch-alias": {
-            "dev-master": "1.4-dev"
+            "dev-master": "1.0-dev"
         }
+    },
+    "archive": {
+      "exclude": ["craw.php", "exec.php"]
     },
     "autoload": {
         "psr-4": { 
             "Peterujah\\NanoBlock\\": "src/" 
         }
     },
-    "minimum-stability": "dev",
     "prefer-stable": true
 }
