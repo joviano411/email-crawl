@@ -4,7 +4,7 @@
 ## Installation
 
 Installation is super-easy via Composer:
-```md
+```cli
 composer require peterujah/email-crawl
 ```
 
