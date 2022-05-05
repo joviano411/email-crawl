@@ -25,7 +25,6 @@ $craw->craw()
 Get scanned response and return CrawlResponse instance
 
 ```php
-$craw->craw()
 $response = $craw->getResponse();
 ```
 
