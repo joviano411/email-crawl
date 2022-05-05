@@ -1,7 +1,7 @@
 {
     "name": "peterujah/email-crawl",
     "type": "library",
-    "description": "Php class to compress output buffer in gzip.",
+    "description": "PHP Email Web Crawler. using curl and command line interface to extract emails from website.",
     "homepage": "https://github.com/peterujah/email-crawl",
     "keywords": [
         "library",
