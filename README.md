@@ -98,6 +98,7 @@ Execute craw through php shell_exec, create a file call exec.php and add below e
 Note: change `PHP_SHELL_EXECUTION_PATH` to your php executable path.
 Once done navigate to https://mycraw.example.com/exec.php
 ```php
+define("PHP_SHELL_EXECUTION_PATH", "path/to/php");
 $crawOptions = array(
     'target' => 'https://example.com',
     'max' => 50,
